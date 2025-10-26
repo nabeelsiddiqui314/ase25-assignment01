@@ -1,6 +1,22 @@
+import java.util.ArrayList;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.io.BufferedReader;
+import java.io.FileReader;
+
 public class CommitMsgHook {
+    private static final Pattern alphabetOnlyPattern = Pattern.compile("^[a-zA-Z]+$");
+
     public static void main(String[] args) {
         String commitMessage = args[0];
+
+        var commitTypesList = loadAdditionalCommitTypes("scripts/commit-types.config");
+
+        System.out.println("Added types: \n" + String.join("\n", commitTypesList));
+
+        // default types from the specification
+        commitTypesList.add("feat");
+        commitTypesList.add("fix");
 
         if (commitMessage.isEmpty()) {
             System.out.println("Commit message is invalid.");
@@ -9,5 +25,31 @@ public class CommitMsgHook {
 
         System.out.println("Commit message is valid.");
         System.exit(0);
+    }
+
+    private static ArrayList<String> loadAdditionalCommitTypes(String filepath) {
+        var commitTypes = new ArrayList<String>();
+
+        try (BufferedReader reader = new BufferedReader(new FileReader(filepath))) {
+            String line;
+
+            while ((line = reader.readLine()) != null) {
+                if (line.isEmpty()) {
+                    continue;
+                }
+                if (!alphabetOnlyPattern.matcher(line).matches()) {
+                    System.out.println("Commit Type: " + line + " not added due to being invalid. Must be a noun without numbers, special characters or spaces.");
+                    continue;
+                }
+
+                commitTypes.add(line);
+            }
+        }
+        catch (Exception e) {
+            System.out.println("Additional commit types will not recognized due to file reading error: ");
+            e.printStackTrace(System.out);
+        }
+
+        return commitTypes;
     }
 }
