@@ -5,14 +5,14 @@ import java.io.BufferedReader;
 import java.io.FileReader;
 
 public class CommitMsgHook {
-    private static final Pattern alphabetOnlyPattern = Pattern.compile("^[a-zA-Z]+$");
+    private static final Pattern nounPattern = Pattern.compile("^[a-zA-Z0-9\\-]+$");
 
     public static void main(String[] args) {
         String commitMessage = args[0];
 
         var commitTypesList = loadAdditionalCommitTypes("scripts/commit-types.config");
 
-        System.out.println("Added types: \n" + String.join("\n", commitTypesList));
+        System.out.println("Added types: \n" + String.join("\n", commitTypesList) + "\n");
 
         // default types from the specification
         commitTypesList.add("feat");
@@ -37,8 +37,8 @@ public class CommitMsgHook {
                 if (line.isEmpty()) {
                     continue;
                 }
-                if (!alphabetOnlyPattern.matcher(line).matches()) {
-                    System.out.println("Commit Type: " + line + " not added due to being invalid. Must be a noun without numbers, special characters or spaces.");
+                if (!nounPattern.matcher(line).matches()) {
+                    System.out.println("Commit Type: \"" + line + "\" not added due to being invalid. Must be a noun (letters, numbers and hyphens only)\n");
                     continue;
                 }
 
