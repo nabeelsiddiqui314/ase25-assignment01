@@ -1,0 +1,7 @@
+#!/usr/bin/bash
+
+> commit-msg-hook
+
+printf "#!/usr/bin/java --source 21\n\n" > commit-msg-hook
+
+cat CommitMsgHook.java >> commit-msg-hook
