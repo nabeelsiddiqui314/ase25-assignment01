@@ -5,7 +5,16 @@ import java.io.BufferedReader;
 import java.io.FileReader;
 
 public class CommitMsgHook {
-    private static final Pattern nounPattern = Pattern.compile("^[a-zA-Z0-9\\-]+$");
+
+    private final class RegexPatterns {
+    	private RegexPatterns() {}
+    	
+    	public static final Pattern compilePattern(String pattern) {
+    	    return Pattern.compile("^" + pattern + "$");
+    	}
+    	
+    	public static final String Noun = "[a-zA-Z0-9\\-]+";
+    }
 
     public static void main(String[] args) {
         String commitMessage = args[0];
@@ -32,6 +41,7 @@ public class CommitMsgHook {
 
         try (BufferedReader reader = new BufferedReader(new FileReader(filepath))) {
             String line;
+            var nounPattern = RegexPatterns.compilePattern(RegexPatterns.Noun);
 
             while ((line = reader.readLine()) != null) {
                 if (line.isEmpty()) {
