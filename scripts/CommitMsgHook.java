@@ -3,13 +3,15 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.io.BufferedReader;
 import java.io.FileReader;
+import java.util.Arrays;
+import java.util.Scanner;
 
 public class CommitMsgHook {
 
     private final class RegexPatterns {
     	private RegexPatterns() {}
     	
-    	public static Pattern compilePattern(String pattern) {
+    	public static Pattern create(String pattern) {
     	    return Pattern.compile("^" + pattern + "$");
     	}
     	
@@ -21,9 +23,23 @@ public class CommitMsgHook {
     	    return "(" + String.join("|", patternList) + ")";
     	}
     	
+    	public static String alternation(String... patternList) {
+    	    return "(" + String.join("|", patternList) + ")";
+    	}
+    	
+    	public static String kleeneClosure(String pattern) {
+    	    return "(" + pattern + ")*";
+    	}
+    	
     	public static final String Noun = "[a-zA-Z0-9\\-]+";
-    	public static final String Sentence = "[a-zA-Z0-9\\-][a-zA-Z0-9\\-\\h+]+";
+    	public static final String WordToken = "[a-zA-Z0-9]+";
+    	public static final String Sentence = "[a-zA-Z0-9\\.@\\-][a-zA-Z0-9\\.@\\-\\h+]*";
+    	public static final String EmptySpace = "[\\s]+";
     }
+    
+    private static Pattern headerPattern;
+    private static Pattern breakingChangeFooterPattern;
+    private static Pattern regularFooterPattern;
 
     public static void main(String[] args) {
         String commitMessage = args[0];
@@ -35,17 +51,49 @@ public class CommitMsgHook {
         // default types from the specification
         commitTypesList.add("feat");
         commitTypesList.add("fix");
+        
+        initRegexPatterns(commitTypesList);
 
         if (commitMessage.isEmpty()) {
             System.out.println("Commit message is invalid.");
             System.exit(1);
         }
         
-        var blankLineSeperatedCommitMsg = commitMessage.split("\\n\\n");
+        var paragraphs = commitMessage.split("\\n\\n");
         
-        if (!isHeaderValid(blankLineSeperatedCommitMsg[0], commitTypesList)) {
+        if (!isHeaderValid(paragraphs[0])) {
             System.out.println("Header invalid.");
             System.exit(1);
+        }
+        
+        if (paragraphs.length > 1) {
+            var emptyPattern = RegexPatterns.create(RegexPatterns.EmptySpace);
+            
+            if (emptyPattern.matcher(paragraphs[1]).matches()) {
+                System.out.println("More than one blank line after header.");
+                System.exit(1);
+            }
+            
+            int i;        
+            for (i = 1; i < paragraphs.length; i++) {
+                if (doesAttemptFooter(paragraphs[i])) {
+                    break;
+                }
+            }
+            
+            String[] footerSectionParts = Arrays.copyOfRange(paragraphs, i, paragraphs.length);
+            String footerSection = String.join("\n", footerSectionParts);
+            
+    	    Scanner scanner = new Scanner(footerSection);
+    	
+    	    while(scanner.hasNextLine()) {
+    	        String line = scanner.nextLine();
+    	    
+    	        if (doesAttemptFooter(line) && !isValidFooter(line)) {
+    	    	    System.out.println("Invalid footer");
+    	    	    System.exit(1);
+    	        }
+    	    }
         }
 
         System.out.println("Commit message is valid.");
@@ -57,7 +105,7 @@ public class CommitMsgHook {
 
         try (BufferedReader reader = new BufferedReader(new FileReader(filepath))) {
             String line;
-            var nounPattern = RegexPatterns.compilePattern(RegexPatterns.Noun);
+            var nounPattern = RegexPatterns.create(RegexPatterns.Noun);
 
             while ((line = reader.readLine()) != null) {
                 if (line.isEmpty()) {
@@ -80,17 +128,55 @@ public class CommitMsgHook {
         return commitTypes;
     }
     
-    private static boolean isHeaderValid(String header, ArrayList<String> validCommitTypesList) {
-        header = header.toLowerCase();
-    	
+    private static void initRegexPatterns(ArrayList<String> validCommitTypesList) {
+        // HEADER
     	String headerRegex = RegexPatterns.alternation(validCommitTypesList) +
     	RegexPatterns.optional("\\(" + RegexPatterns.Noun + "\\)") +
     	RegexPatterns.optional("!") +
     	": " +
     	RegexPatterns.Sentence;
     	
-    	var pattern = RegexPatterns.compilePattern(headerRegex);
+    	headerPattern = RegexPatterns.create(headerRegex);
     	
-    	return pattern.matcher(header).matches();
+    	// BREAKING CHANGE FOOTER
+    	String breakingChangeFooterRegex = RegexPatterns.alternation("BREAKING CHANGE: ", "BREAKING-CHANGE: ") + RegexPatterns.Sentence;
+    	
+    	breakingChangeFooterPattern = RegexPatterns.create(breakingChangeFooterRegex);
+    	
+    	// REGULAR FOOTER
+    	String regularFooterRegex = RegexPatterns.WordToken +
+    	        RegexPatterns.kleeneClosure("\\-" + RegexPatterns.WordToken) +
+    	        RegexPatterns.alternation(": ", " #") +
+    	        RegexPatterns.Sentence;
+    	        
+    	regularFooterPattern = RegexPatterns.create(regularFooterRegex);
+        
+    }
+    
+    private static boolean isHeaderValid(String header) {
+        header = header.toLowerCase();
+    	return headerPattern.matcher(header).matches();
+    }
+    
+    // No way to enforce footers properly since a "wrongly written footer token" could also be a part of the main body or footer value. 
+    // A use of colon or <space># in this solution is interpreted as an attempt to write a footer.
+    private static boolean doesAttemptFooter(String line) {
+        String lowerCaseLine = line.toLowerCase();
+        return line.contains(":") || line.contains(" #") ||
+               lowerCaseLine.startsWith("breaking change") || lowerCaseLine.startsWith("breaking-change");
+    }
+    
+    private static boolean isValidFooter(String line) {
+        String lowerCaseLine = line.toLowerCase();
+        Pattern pattern;
+        
+        if (lowerCaseLine.startsWith("breaking change") || lowerCaseLine.startsWith("breaking-change")) {
+            pattern = breakingChangeFooterPattern;
+        }
+        else {
+    	    pattern = regularFooterPattern;
+        }
+    	
+    	return pattern.matcher(line).matches();
     }
 }
