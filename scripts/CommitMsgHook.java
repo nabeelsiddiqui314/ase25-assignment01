@@ -22,7 +22,7 @@ public class CommitMsgHook {
     	}
     	
     	public static final String Noun = "[a-zA-Z0-9\\-]+";
-    	public static final String Sentence = "[a-zA-Z0-9\\-\\s\\s+]+";
+    	public static final String Sentence = "[a-zA-Z0-9\\-][a-zA-Z0-9\\-\\h+]+";
     }
 
     public static void main(String[] args) {
@@ -87,8 +87,7 @@ public class CommitMsgHook {
     	RegexPatterns.optional("\\(" + RegexPatterns.Noun + "\\)") +
     	RegexPatterns.optional("!") +
     	": " +
-    	RegexPatterns.Noun +
-    	RegexPatterns.optional(RegexPatterns.Sentence);
+    	RegexPatterns.Sentence;
     	
     	var pattern = RegexPatterns.compilePattern(headerRegex);
     	
